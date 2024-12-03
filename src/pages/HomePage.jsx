@@ -13,8 +13,20 @@ export default function HomePage() {
   const [damageDetails, setDamageDetails] = useState(null); // För skadedetaljer
   const [error, setError] = useState("");
   const [sortOption, setSortOption] = useState("default"); // Standard sorteringsalternativ
-
+  const [winStreak, setWinStreak] = useState(0); // Lägg till win streak
   // Hämta och bearbeta matchdata
+
+  const calculateWinStreak = (matches) => {
+    let streak = 0;
+    for (const match of matches) {
+      if (match.win) {
+        streak++;
+      } else {
+        break; // Stoppa om vi stöter på en förlust
+      }
+    }
+    return streak;
+  };
   const handleSearch = async (gameName, tagLine) => {
     try {
       setError("");
@@ -60,6 +72,7 @@ export default function HomePage() {
 
       setMatches(aramMatches);
       setAverageStats(calculateAverageStats(aramMatches));
+      setWinStreak(calculateWinStreak(aramMatches)); // Uppdatera win streak
     } catch (err) {
       console.error("Error fetching data:", err.message);
       setError("Failed to fetch data. Please check your input.");
@@ -106,6 +119,11 @@ export default function HomePage() {
       <SearchBar onSearch={handleSearch} />
       {error && <p className="text-red-500 mt-4">{error}</p>}
       <StatsSummary averageStats={averageStats} />
+      <div className="my-4">
+        <p className="text-lg font-bold text-green-400">
+          Current Win Streak: <span className="text-white">{winStreak}</span>
+        </p>
+      </div>
       <div className="mb-6">
         <label htmlFor="sortOption" className="text-lg font-semibold mr-4">
           Sort By:
