@@ -3,16 +3,18 @@ import SearchBar from "../components/SearchBar";
 import MatchCard from "../components/MatchCard";
 import MatchDetails from "../components/MatchDetails";
 import StatsSummary from "../components/StatsSummary";
-import { getAccountInfo, getMatchHistory, getMatchDetails } from "../utils/riotApi";
+import { getAccountInfo, getMatchHistory, getMatchDetails, getMatchTimeline, processDamageDetails } from "../utils/riotApi";
 import { calculateAverageStats } from "../utils/statistics";
 
 export default function HomePage() {
   const [matches, setMatches] = useState([]);
   const [averageStats, setAverageStats] = useState(null);
   const [selectedMatch, setSelectedMatch] = useState(null); // För vald match
+  const [damageDetails, setDamageDetails] = useState(null); // För skadedetaljer
   const [error, setError] = useState("");
   const [sortOption, setSortOption] = useState("default"); // Standard sorteringsalternativ
 
+  // Hämta och bearbeta matchdata
   const handleSearch = async (gameName, tagLine) => {
     try {
       setError("");
@@ -44,6 +46,8 @@ export default function HomePage() {
                 win: participant.win,
                 damageDealt: participant.totalDamageDealtToChampions,
                 damageTaken: participant.totalDamageTaken,
+                matchId, // Lägg till matchId
+                participantId: participant.participantId, // Lägg till participantId
               });
             }
           }
@@ -62,21 +66,34 @@ export default function HomePage() {
     }
   };
 
+  // Sortera matcher baserat på valt alternativ
   const handleSortChange = (e) => {
     const sortValue = e.target.value;
     setSortOption(sortValue);
 
-    // Sortera matcher baserat på vald option
     const sortedMatches = [...matches].sort((a, b) => {
       if (sortValue === "dealt") return b.damageDealt - a.damageDealt;
       if (sortValue === "taken") return b.damageTaken - a.damageTaken;
       if (sortValue === "kills") return b.kills - a.kills;
-      if (sortValue === "deaths") return b.deaths - a.deaths; // Lägre deaths är bättre
+      if (sortValue === "deaths") return a.deaths - b.deaths; // Lägre deaths är bättre
       if (sortValue === "assists") return b.assists - a.assists;
       return 0; // Ingen sortering för default
     });
 
     setMatches(sortedMatches);
+  };
+
+  // Hantera klick på en match och hämta skadedetaljer
+  const handleMatchClick = async (match) => {
+    setSelectedMatch(match);
+    try {
+      const timeline = await getMatchTimeline(match.matchId);
+      const details = processDamageDetails(timeline, match.participantId);
+      setDamageDetails(details);
+    } catch (err) {
+      console.error("Error fetching damage details:", err.message);
+      setDamageDetails(null);
+    }
   };
 
   return (
@@ -109,11 +126,19 @@ export default function HomePage() {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-5xl px-4">
         {matches.map((match, index) => (
-          <MatchCard key={index} match={match} onClick={() => setSelectedMatch(match)} />
+          <MatchCard
+            key={index}
+            match={match}
+            onClick={() => handleMatchClick(match)} // Skicka vald match till hantering
+          />
         ))}
       </div>
-      {selectedMatch && (
-        <MatchDetails match={selectedMatch} onClose={() => setSelectedMatch(null)} />
+      {selectedMatch && damageDetails && (
+        <MatchDetails
+          match={selectedMatch}
+          damageDetails={damageDetails} // Skicka skadedetaljer till modalen
+          onClose={() => setSelectedMatch(null)} // Stäng modalen
+        />
       )}
     </div>
   );
